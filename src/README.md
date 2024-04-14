@@ -21,23 +21,28 @@ After pulling the entire repo, we first need to install all necessary packages. 
 ## Front-end Service
 Open a new terminal and run the following commands to start the frontend server at port `8000`:
 ```
+source venv/bin/activate
 cd src/frontend
+python manage.py makemigrations && python manage.py migrate
 python manage.py runserver 8000
 ```
 
 ## Catalog Service
 1. Open a new terminal and start Redis at port `6379` for periodic tasks:
     ```
+    source venv/bin/activate
     cd src/catalog
     redis-server
     ```
 2. Open another terminal and start the periodic task to restock products:
     ```
+    source venv/bin/activate
     cd src/catalog
     celery -A catalog worker --loglevel=info --beat
     ```
 3. Open a new terminal and run the following commands to start the catalog server at port `8001`:
     ```
+    source venv/bin/activate
     cd src/catalog
     python manage.py makemigrations && python manage.py migrate
     python manage.py runserver 8001
@@ -46,6 +51,7 @@ python manage.py runserver 8000
 ## Order Service
 Open a new terminal and run the following commands to start the order server at port `8002`:
 ```
+source venv/bin/activate
 cd src/order
 python manage.py makemigrations && python manage.py migrate
 python manage.py runserver 8002
