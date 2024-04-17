@@ -10,7 +10,13 @@ from .utils import ReadWriteLock
 CATALOG_SERVER_HOST = "localhost"
 CATALOG_SERVER_PORT = "8001"
 ORDER_SERVER_HOST = "localhost"
-ORDER_SERVER_PORT = "8002"
+ORDER_SERVER_PORTS = {
+    "3": "8002",
+    "2": "8003",
+    "1": "8004",
+}
+ORDER_LEADER_ID="3"
+ORDER_LEADER_PORT="8002"
 
 # Create a cache to store 5 query repsonses
 cache = []
@@ -21,6 +27,37 @@ cache_lock = ReadWriteLock()
 # Create a thread pool executor for concurrent task execution
 executor = ThreadPoolExecutor()
 
+
+def find_order_leader():
+    '''
+    This function is executed only when the frontend server starts.
+    '''
+    global ORDER_LEADER_ID, ORDER_LEADER_PORT
+    i = 3
+    while True:
+        try:
+            # Send a health check request to the order replica server to verify its responsiveness
+            health_check_response = requests.get(f"http://{ORDER_SERVER_HOST}:{ORDER_SERVER_PORTS[str(i)]}/")
+            
+            # Set the ID and the port of the leader order server
+            ORDER_LEADER_ID = str(i)
+            ORDER_LEADER_PORT = ORDER_SERVER_PORTS[str(i)]
+            print(f"Order leader ID: {ORDER_LEADER_ID}, order leader port: {ORDER_LEADER_PORT}")
+
+            for id, port in ORDER_SERVER_PORTS.items():
+                if id is not ORDER_LEADER_ID:
+                    leader_data = {"leader_id": ORDER_LEADER_ID}
+                    try:
+                        # Inform other order server replicas about the leader ID
+                        leader_response = requests.post(f"http://{ORDER_SERVER_HOST}:{port}/replicas/leader/", json=leader_data)
+                    except:
+                        pass           
+            break
+        except:
+            # Update the next checking ID
+            if i == 0: i = 3
+            else: i -= 1
+            
 
 def process_get_product_request(product_name):
     # Check whether the product is in the cache
@@ -45,13 +82,13 @@ def process_get_product_request(product_name):
 
 def process_get_order_request(order_number):
     # Ask for the order detail from the order server
-    response = requests.get(f"http://{ORDER_SERVER_HOST}:{ORDER_SERVER_PORT}/orders/{order_number}/")
+    response = requests.get(f"http://{ORDER_SERVER_HOST}:{ORDER_LEADER_PORT}/orders/{order_number}/")
     return JsonResponse(status = response.status_code, data = response.json())
 
 
 def process_post_order_request(order_data):
     # Send the buy request to the order server
-    response = requests.post(f"http://{ORDER_SERVER_HOST}:{ORDER_SERVER_PORT}/orders/", json=order_data)
+    response = requests.post(f"http://{ORDER_SERVER_HOST}:{ORDER_LEADER_PORT}/orders/", json=order_data)
     return JsonResponse(status = response.status_code, data = response.json())
 
 

@@ -49,10 +49,24 @@ python manage.py runserver 8000
     ```
 
 ## Order Service
-Open a new terminal and run the following commands to start the order server at port `8002`:
-```
-source venv/bin/activate
-cd src/order
-python manage.py makemigrations && python manage.py migrate
-python manage.py runserver 8002
-```
+1. Open a new terminal and run the following commands to start one order server replica at port `8002`:
+    ```
+    source venv/bin/activate
+    cd src/order
+    python manage.py makemigrations && DB_NAME=db1.sqlite3 python manage.py migrate
+    DB_NAME=db1.sqlite3 python manage.py runserver 8002
+    ```
+2. Open another terminal and run the following commands to start another order server replica at port `8003`:
+    ```
+    source venv/bin/activate
+    cd src/order
+    python manage.py makemigrations && DB_NAME=db2.sqlite3 python manage.py migrate
+    DB_NAME=db2.sqlite3 python manage.py runserver 8003
+    ```
+3. Open another terminal and run the following commands to start the last order server replica at port `8004`:
+    ```
+    source venv/bin/activate
+    cd src/order
+    python manage.py makemigrations && DB_NAME=db3.sqlite3 python manage.py migrate
+    DB_NAME=db3.sqlite3 python manage.py runserver 8004
+    ```
