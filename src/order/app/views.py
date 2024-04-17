@@ -46,7 +46,7 @@ def process_get_order_request(order_number):
 
 def process_post_order_request(order_data):
     # Ask for the product detail from the catalog server
-    product_response = requests.get(f"http://{CATALOG_SERVER_HOST}:{CATALOG_SERVER_PORT}/products/{order_data["name"]}/")
+    product_response = requests.get(f"http://{CATALOG_SERVER_HOST}:{CATALOG_SERVER_PORT}/products/{order_data['name']}/")
     if product_response.status_code == 200:
         # Check whether the stock quantity is adequate
         if order_data["quantity"] > product_response.json()["data"]["quantity"]:

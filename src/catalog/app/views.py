@@ -37,8 +37,8 @@ def restock_product():
                     product_in_stock.save()
                 
                 # Send request to the frontend server to invalidate the restocked product in the cache
-                requests.delete(f"http://{FRONTEND_SERVER_HOST}:{FRONTEND_SERVER_PORT}/cache/{product["name"]}/")
-                print(f"Restocked { product["name"]}")
+                requests.delete(f"http://{FRONTEND_SERVER_HOST}:{FRONTEND_SERVER_PORT}/cache/{product['name']}/")
+                print(f"Restocked { product['name']}")
         except Product.DoesNotExist:
             # Create the product in the stock database if it does not exist
             with products_lock:
@@ -80,7 +80,7 @@ def process_post_order_request(order_data):
                 product.save()
 
                 # Send request to the frontend server to invalidate the ordered product in the cache
-                requests.delete(f"http://{FRONTEND_SERVER_HOST}:{FRONTEND_SERVER_PORT}/cache/{order_data["name"]}/")
+                requests.delete(f"http://{FRONTEND_SERVER_HOST}:{FRONTEND_SERVER_PORT}/cache/{order_data['name']}/")
 
             # Return success response
             return JsonResponse(status=200, data={"data": {"message": "Product stock updated successfully"}})

@@ -60,11 +60,15 @@ def find_order_leader():
             
 
 def process_get_product_request(product_name):
+    global cache
     # Check whether the product is in the cache
     with cache_lock:
-        for product in cache:
-            if product["name"] == product_name:
-                return JsonResponse(status = product["response"].status_code, data = product["response"].json())
+        for i in range(len(cache)):
+            if cache[i]["name"] == product_name:
+                cache_response = cache[i]["response"]
+                cache.pop(i)
+                cache.append({"name": product_name, "response": cache_response})
+                return JsonResponse(status = cache_response.status_code, data = cache_response.json())
     
     # Ask for the product detail from the catalog server
     response = requests.get(f"http://{CATALOG_SERVER_HOST}:{CATALOG_SERVER_PORT}/products/{product_name}/")
@@ -76,7 +80,7 @@ def process_get_product_request(product_name):
             if len(cache) == 5:
                 cache.pop(0)
             cache.append({"name": product_name, "response": response})
-    
+    print(cache)
     return JsonResponse(status = response.status_code, data = response.json())
 
 
