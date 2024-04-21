@@ -1,9 +1,15 @@
 import json
+import logging
 import requests
 from concurrent.futures import ThreadPoolExecutor
+from django.views import View
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from .utils import ReadWriteLock
+import time
+import threading
 
 
 # Define the host and port for the catalog and order servers
@@ -15,8 +21,10 @@ ORDER_SERVER_PORTS = {
     "2": "8003",
     "1": "8004",
 }
-ORDER_LEADER_ID="3"
-ORDER_LEADER_PORT="8002"
+order_leader_ID=None
+order_leader_port=None
+
+logger = logging.getLogger(__name__)
 
 # Create a cache to store 5 query repsonses
 cache = []
@@ -24,39 +32,50 @@ cache = []
 # Create a read-write lock for accessing the cache
 cache_lock = ReadWriteLock()
 
+leader_lock = threading.Lock()
+
 # Create a thread pool executor for concurrent task execution
 executor = ThreadPoolExecutor()
 
 
-def find_order_leader():
+def find_order_leader(max_attempts=3):
     '''
-    This function is executed only when the frontend server starts.
+    This function is executed when there is no leader found, and the max_attempts is used for timeout control.
     '''
-    global ORDER_LEADER_ID, ORDER_LEADER_PORT
+    global order_leader_ID, order_leader_port
     i = 3
-    while True:
+    attempts = 0
+    while attempts < max_attempts:
         try:
             # Send a health check request to the order replica server to verify its responsiveness
             health_check_response = requests.get(f"http://{ORDER_SERVER_HOST}:{ORDER_SERVER_PORTS[str(i)]}/")
             
             # Set the ID and the port of the leader order server
-            ORDER_LEADER_ID = str(i)
-            ORDER_LEADER_PORT = ORDER_SERVER_PORTS[str(i)]
-            print(f"Order leader ID: {ORDER_LEADER_ID}, order leader port: {ORDER_LEADER_PORT}")
+            with leader_lock:
+                order_leader_ID = str(i)
+                order_leader_port = ORDER_SERVER_PORTS[str(i)]
+            logger.info(f"Order leader ID: {order_leader_ID}, order leader port: {order_leader_port}")
 
+            leader_data = {"leader_id": order_leader_ID}
             for id, port in ORDER_SERVER_PORTS.items():
-                if id is not ORDER_LEADER_ID:
-                    leader_data = {"leader_id": ORDER_LEADER_ID}
+                if id is not order_leader_ID:
                     try:
                         # Inform other order server replicas about the leader ID
                         leader_response = requests.post(f"http://{ORDER_SERVER_HOST}:{port}/replicas/leader/", json=leader_data)
                     except:
-                        pass           
-            break
+                        pass
+                        
+            return order_leader_ID
         except:
             # Update the next checking ID
-            if i == 0: i = 3
+            if i == 0: 
+                logger.info("Temporary not find available order server, retrying in 3 seconds...")
+                time.sleep(3)
+                attempts += 1
+                i = 3
             else: i -= 1
+    
+    return 
             
 
 def process_get_product_request(product_name):
@@ -80,19 +99,18 @@ def process_get_product_request(product_name):
             if len(cache) == 5:
                 cache.pop(0)
             cache.append({"name": product_name, "response": response})
-    print(cache)
+    logger.info("cache:", cache)
     return JsonResponse(status = response.status_code, data = response.json())
 
 
 def process_get_order_request(order_number):
     # Ask for the order detail from the order server
-    response = requests.get(f"http://{ORDER_SERVER_HOST}:{ORDER_LEADER_PORT}/orders/{order_number}/")
+    response = requests.get(f"http://{ORDER_SERVER_HOST}:{order_leader_port}/orders/{order_number}/")
     return JsonResponse(status = response.status_code, data = response.json())
-
 
 def process_post_order_request(order_data):
     # Send the buy request to the order server
-    response = requests.post(f"http://{ORDER_SERVER_HOST}:{ORDER_LEADER_PORT}/orders/", json=order_data)
+    response = requests.post(f"http://{ORDER_SERVER_HOST}:{order_leader_port}/orders/", json=order_data)
     return JsonResponse(status = response.status_code, data = response.json())
 
 
@@ -129,9 +147,20 @@ def get_order(request, order_number):
         response = future.result()
         return response
     except Exception as e:
+        logger.info("Error connecting to leader. Re-electing...")
+        # print("Error connecting to leader. Re-electing...")
+
+        leader = find_order_leader()
+        if leader:
+            logger.info(f'''Current leader switched to ID: {leader}''')
+            try:
+                future = executor.submit(process_get_order_request, order_number)
+                response = future.result()
+                return response
+            except:
+                pass  
         return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
     
-
 @require_POST
 def post_order(request):
     try:
@@ -143,6 +172,18 @@ def post_order(request):
         response = future.result()
         return response
     except Exception as e:
+        logger.info("Error connecting to leader. Re-electing...")
+        # print("Error connecting to leader. Re-electing...")
+
+        leader = find_order_leader()
+        if leader:
+            logger.info(f'''Current leader switched to ID: {leader}''')
+            try:
+                future = executor.submit(process_post_order_request, order_data)
+                response = future.result()
+                return response
+            except:
+                pass  
         return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
 
 
@@ -156,3 +197,36 @@ def delete_cache(request, product_name):
         return response
     except Exception as e:
         return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
+
+@method_decorator(csrf_exempt, name='dispatch')
+class OrderLeaderView(View):
+    def get(self, request, *args, **kwargs):
+        '''
+        Get current order leader
+        '''
+        global order_leader_ID, order_leader_port
+        if order_leader_ID and order_leader_port:
+            return JsonResponse(status=200, data={"data": {"code": 200, "leader_ID": order_leader_ID, "leader_port": order_leader_port}})
+        else:
+            return JsonResponse(status=404, data={"error": {"code": 404, "message": "Leader not Found"}})
+
+    def post(self, request, *args, **kwargs):
+        '''
+        Try to use new_leader_id to replace current order leader
+        '''
+        global order_leader_ID, order_leader_port
+        try:
+            data = json.loads(request.body)
+            new_leader_id = data["new_leader_id"] if "new_leader_id" in data else None
+            if not order_leader_ID or new_leader_id > order_leader_ID:
+                with leader_lock:
+                    previous_leader_id = order_leader_ID
+                    order_leader_ID = new_leader_id
+                    order_leader_port = ORDER_SERVER_PORTS[str(new_leader_id)]
+                    logger.info(f'''Current leader switched from ID: {previous_leader_id} to to ID: {order_leader_ID}''')
+
+                return JsonResponse(status=200, data={"data": {"code": 200, "leader": order_leader_ID}})
+            else:
+                return JsonResponse(status=404, data={"error": {"code": 400, "message": "Remain original leader"}})
+        except Exception as e:
+            return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})

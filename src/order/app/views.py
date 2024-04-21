@@ -5,7 +5,8 @@ from django.http import HttpResponse, JsonResponse
 from django.forms.models import model_to_dict
 from django.views.decorators.http import require_GET, require_POST
 from .models import Order
-from .utils import ReadWriteLock
+from .utils.locks import ReadWriteLock
+from .utils.leader import get_current_leader
 
 
 # Define the host and port for the catalog server
@@ -17,8 +18,7 @@ ORDER_SERVER_PORTS = {
     "2": "8003",
     "1": "8004",
 }
-ORDER_LEADER_ID="3"
-ORDER_LEADER_PORT="8002"
+order_leader_ID, order_leader_port = get_current_leader()
 
 # Create a read-write lock for accessing order data
 orders_lock = ReadWriteLock()
@@ -66,7 +66,7 @@ def process_post_order_request(order_data):
 
         # Send order data to other replicas for synchronizing order log
         for id, port in ORDER_SERVER_PORTS.items():
-            if id is not ORDER_LEADER_ID:
+            if id is not order_leader_ID:
                 try:
                     replica_order_response = requests.post(f"http://{ORDER_SERVER_HOST}:{port}/replicas/order/", json=order_data)
                 except Exception as e:
@@ -77,11 +77,11 @@ def process_post_order_request(order_data):
 
 
 def process_post_replicas_leader_request(leader_data):
-    global ORDER_LEADER_ID, ORDER_LEADER_PORT
+    global order_leader_ID, order_leader_port
     try:
         # Set the ID and the port of the leader order server
-        ORDER_LEADER_ID = leader_data["leader_id"]
-        ORDER_LEADER_PORT = ORDER_SERVER_PORTS[ORDER_LEADER_ID]
+        order_leader_ID = leader_data["leader_id"]
+        order_leader_port = ORDER_SERVER_PORTS[order_leader_ID]
         return HttpResponse(status=204)
     except Exception as e:
         return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
@@ -98,11 +98,20 @@ def process_post_replicas_order_request(order_data):
         return HttpResponse(status=204)
     except Exception as e:
         return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
+    
+def process_post_sync_order_request(next_number):
+    try:
+        # Query for all orders from next_id to the latest
+        orders = Order.objects.filter(order_number__gte=next_number).values()
+        order_list = list(orders)
+        return JsonResponse(status=200, data={'orders': order_list})
+    except Exception as e:
+        return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
 
 
 @require_GET
 def get_order(request, order_number):
-    print(ORDER_LEADER_ID, ORDER_LEADER_PORT)
+    print(order_leader_ID, order_leader_port)
     try:
         # Submit a task to the thread pool executor
         future = executor.submit(process_get_order_request, order_number)
@@ -149,6 +158,21 @@ def post_replicas_order(request):
         # Submit a task to the thread pool executor
         future = executor.submit(process_post_replicas_order_request, order_data)
         # Wait for the result of execution
+        response = future.result()
+        return response
+    except Exception as e:
+        return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
+
+@require_POST
+def post_sync_order(request):
+    print(order_leader_ID)
+    if not order_leader_ID:
+        return JsonResponse(status=200, data={'orders': []})
+    
+    try:
+        data = json.loads(request.body)
+        next_number = data.get('next_number', 1)
+        future = executor.submit(process_post_sync_order_request, next_number)
         response = future.result()
         return response
     except Exception as e:

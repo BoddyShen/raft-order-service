@@ -28,45 +28,56 @@ python manage.py runserver 8000
 ```
 
 ## Catalog Service
+
 1. Open a new terminal and start Redis at port `6379` for periodic tasks:
-    ```
-    source venv/bin/activate
-    cd src/catalog
-    redis-server
-    ```
+   ```
+   source venv/bin/activate
+   cd src/catalog
+   redis-server
+   ```
 2. Open another terminal and start the periodic task to restock products:
-    ```
-    source venv/bin/activate
-    cd src/catalog
-    celery -A catalog worker --loglevel=info --beat
-    ```
+   ```
+   source venv/bin/activate
+   cd src/catalog
+   celery -A catalog worker --loglevel=info --beat
+   ```
 3. Open a new terminal and run the following commands to start the catalog server at port `8001`:
-    ```
-    source venv/bin/activate
-    cd src/catalog
-    python manage.py makemigrations && python manage.py migrate
-    python manage.py runserver 8001
-    ```
+   ```
+   source venv/bin/activate
+   cd src/catalog
+   python manage.py makemigrations && python manage.py migrate
+   python manage.py runserver 8001
+   ```
 
 ## Order Service
+
 1. Open a new terminal and run the following commands to start one order server replica at port `8002`:
-    ```
-    source venv/bin/activate
-    cd src/order
-    python manage.py makemigrations && DB_NAME=db1.sqlite3 python manage.py migrate
-    DB_NAME=db1.sqlite3 python manage.py runserver 8002
-    ```
+   ```
+   source venv/bin/activate
+   cd src/order
+   python manage.py makemigrations && DB_NAME=db1.sqlite3 python manage.py migrate
+   ORDER_SERVER_ID=3 DB_NAME=db1.sqlite3 python manage.py runserver 8002
+   ```
 2. Open another terminal and run the following commands to start another order server replica at port `8003`:
-    ```
-    source venv/bin/activate
-    cd src/order
-    python manage.py makemigrations && DB_NAME=db2.sqlite3 python manage.py migrate
-    DB_NAME=db2.sqlite3 python manage.py runserver 8003
-    ```
+   ```
+   source venv/bin/activate
+   cd src/order
+   python manage.py makemigrations && DB_NAME=db2.sqlite3 python manage.py migrate
+   ORDER_SERVER_ID=2 DB_NAME=db2.sqlite3 python manage.py runserver 8003
+   ```
 3. Open another terminal and run the following commands to start the last order server replica at port `8004`:
-    ```
-    source venv/bin/activate
-    cd src/order
-    python manage.py makemigrations && DB_NAME=db3.sqlite3 python manage.py migrate
-    DB_NAME=db3.sqlite3 python manage.py runserver 8004
-    ```
+   ```
+   source venv/bin/activate
+   cd src/order
+   python manage.py makemigrations && DB_NAME=db3.sqlite3 python manage.py migrate
+   ORDER_SERVER_ID=1 DB_NAME=db3.sqlite3 python manage.py runserver 8004
+   ```
+
+## Testing
+
+1. Integration tests in frontend:
+   ```
+   source venv/bin/activate
+   cd src/frontend
+   pytest tests -v
+   ```
