@@ -61,14 +61,14 @@ def find_order_leader(max_attempts=3):
                 if id is not order_leader_ID:
                     try:
                         # Inform other order server replicas about the leader ID
-                        leader_response = requests.post(f"http://{ORDER_SERVER_HOST}:{port}/replicas/leader/", json=leader_data)
+                        leader_response = requests.post(f"http://{ORDER_SERVER_HOST}:{port}/replicas/leaders/", json=leader_data)
                     except:
                         pass
                         
             return order_leader_ID
         except:
             # Update the next checking ID
-            if i == 0: 
+            if i == 1: 
                 logger.info("Temporary not find available order server, retrying in 3 seconds...")
                 time.sleep(3)
                 attempts += 1
@@ -124,6 +124,14 @@ def process_delete_cache_request(product_name):
     
     # Return response indicating that the product cache invalidation was successful
     return JsonResponse(status=200, data={"data": {"message": f"Cache invalidated successfully"}})
+
+
+def process_get_leader_request():
+    global order_leader_ID, order_leader_port
+    if order_leader_ID and order_leader_port:
+        return JsonResponse(status=200, data={"data": {"leader_ID": order_leader_ID, "leader_port": order_leader_port}})
+    else:
+        return JsonResponse(status=404, data={"error": {"code": 404, "message": "Leader not found"}})
 
 
 @require_GET
@@ -197,36 +205,15 @@ def delete_cache(request, product_name):
         return response
     except Exception as e:
         return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
+    
 
-@method_decorator(csrf_exempt, name='dispatch')
-class OrderLeaderView(View):
-    def get(self, request, *args, **kwargs):
-        '''
-        Get current order leader
-        '''
-        global order_leader_ID, order_leader_port
-        if order_leader_ID and order_leader_port:
-            return JsonResponse(status=200, data={"data": {"code": 200, "leader_ID": order_leader_ID, "leader_port": order_leader_port}})
-        else:
-            return JsonResponse(status=404, data={"error": {"code": 404, "message": "Leader not Found"}})
-
-    def post(self, request, *args, **kwargs):
-        '''
-        Try to use new_leader_id to replace current order leader
-        '''
-        global order_leader_ID, order_leader_port
-        try:
-            data = json.loads(request.body)
-            new_leader_id = data["new_leader_id"] if "new_leader_id" in data else None
-            if not order_leader_ID or new_leader_id > order_leader_ID:
-                with leader_lock:
-                    previous_leader_id = order_leader_ID
-                    order_leader_ID = new_leader_id
-                    order_leader_port = ORDER_SERVER_PORTS[str(new_leader_id)]
-                    logger.info(f'''Current leader switched from ID: {previous_leader_id} to to ID: {order_leader_ID}''')
-
-                return JsonResponse(status=200, data={"data": {"code": 200, "leader": order_leader_ID}})
-            else:
-                return JsonResponse(status=404, data={"error": {"code": 400, "message": "Remain original leader"}})
-        except Exception as e:
-            return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
+@require_GET
+def get_leader(request):
+    try:
+        # Submit a task to the thread pool executor
+        future = executor.submit(process_get_leader_request)
+        # Wait for the result of execution
+        response = future.result()
+        return response
+    except Exception as e:
+        return JsonResponse(status = 500, data = {"error": {"code": 500, "message": "Internal server error"}})

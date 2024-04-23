@@ -7,5 +7,5 @@ urlpatterns = [
     path('orders/<str:order_number>/', views.get_order),
     path('orders/', csrf_exempt(views.post_order)),
     path('cache/<str:product_name>/', csrf_exempt(views.delete_cache)),
-    path('leader/', views.OrderLeaderView.as_view()),
+    path('leaders/', views.get_leader),
 ]

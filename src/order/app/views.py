@@ -68,7 +68,7 @@ def process_post_order_request(order_data):
         for id, port in ORDER_SERVER_PORTS.items():
             if id is not order_leader_ID:
                 try:
-                    replica_order_response = requests.post(f"http://{ORDER_SERVER_HOST}:{port}/replicas/order/", json=order_data)
+                    replica_order_response = requests.post(f"http://{ORDER_SERVER_HOST}:{port}/replicas/orders/", json=order_data)
                 except Exception as e:
                     pass
         return JsonResponse(status=200, data={"data": model_to_dict(order, exclude=['product_name', 'quantity'])})
@@ -99,12 +99,13 @@ def process_post_replicas_order_request(order_data):
     except Exception as e:
         return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
     
-def process_post_sync_order_request(next_number):
+def process_get_sync_orders_request(next_order_number):
     try:
         # Query for all orders from next_id to the latest
-        orders = Order.objects.filter(order_number__gte=next_number).values()
-        order_list = list(orders)
-        return JsonResponse(status=200, data={'orders': order_list})
+        with orders_lock:
+            orders = Order.objects.filter(order_number__gte=next_order_number).values()
+
+        return JsonResponse(status=200, data={"data": {"orders": list(orders)}})
     except Exception as e:
         return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
 
@@ -163,16 +164,11 @@ def post_replicas_order(request):
     except Exception as e:
         return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
 
-@require_POST
-def post_sync_order(request):
+@require_GET
+def get_sync_orders(request, next_order_number):
     print(order_leader_ID)
-    if not order_leader_ID:
-        return JsonResponse(status=200, data={'orders': []})
-    
     try:
-        data = json.loads(request.body)
-        next_number = data.get('next_number', 1)
-        future = executor.submit(process_post_sync_order_request, next_number)
+        future = executor.submit(process_get_sync_orders_request, next_order_number)
         response = future.result()
         return response
     except Exception as e:
