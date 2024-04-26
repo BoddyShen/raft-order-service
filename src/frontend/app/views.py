@@ -99,7 +99,6 @@ def process_get_product_request(product_name):
             if len(cache) == 5:
                 cache.pop(0)
             cache.append({"name": product_name, "response": response})
-    logger.info("cache:", cache)
     return JsonResponse(status = response.status_code, data = response.json())
 
 
@@ -156,7 +155,6 @@ def get_order(request, order_number):
         return response
     except Exception as e:
         logger.info("Error connecting to leader. Re-electing...")
-        # print("Error connecting to leader. Re-electing...")
 
         leader = find_order_leader()
         if leader:
