@@ -81,3 +81,10 @@ python manage.py runserver 8000
    cd src/frontend
    pytest tests -v
    ```
+
+## Client
+
+```
+cd src/client
+python client.py [frontend_host] [frontend_port] [order_probability] [iterations]
+```
