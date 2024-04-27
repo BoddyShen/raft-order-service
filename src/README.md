@@ -1,5 +1,21 @@
 # How to Run
-## Prerequisites
+
+## Run the Applications Using a Script
+1. Check whether you are in the root directory:
+    ```
+    cd spring24-lab3-liangyu0516-BoddyShen/
+    ```
+2. Run the shell script to start all applications:
+    ```
+    ./build.sh
+    ```
+3. Run the shell script to stop all applications:
+    ```
+    ./stop.sh
+    ```
+
+## Run the Applications Manually
+### Prerequisites
 After pulling the entire repo, we first need to install all necessary packages. We will use `venv` to do so.
 1. Check whether you are in the root directory:
     ```
@@ -18,7 +34,7 @@ After pulling the entire repo, we first need to install all necessary packages. 
     pip install -r requirements.txt
     ```
 
-## Front-end Service
+### Front-end Service
 
 Open a new terminal and run the following command to start the frontend server at port `8000`. Use `USE_CACHE=True` to enable caching and `USE_CACHE=False` to disable caching:
 ```
@@ -28,7 +44,7 @@ python manage.py makemigrations && python manage.py migrate
 USE_CACHE=<True or False> python manage.py runserver 8000
 ```
 
-## Catalog Service
+### Catalog Service
 
 1. Open a new terminal and start Redis at port `6379` for periodic tasks:
    ```
@@ -36,21 +52,21 @@ USE_CACHE=<True or False> python manage.py runserver 8000
    cd src/catalog
    redis-server
    ```
-2. Open another terminal and start the periodic task to restock products:
-   ```
-   source venv/bin/activate
-   cd src/catalog
-   celery -A catalog worker --loglevel=info --beat
-   ```
-3. Open a new terminal and run the following commands to start the catalog server at port `8001`:
+2. Open a new terminal and run the following commands to start the catalog server at port `8001`:
    ```
    source venv/bin/activate
    cd src/catalog
    python manage.py makemigrations && python manage.py migrate
    python manage.py runserver 8001
    ```
+3. Open another terminal and start the periodic task to restock products:
+   ```
+   source venv/bin/activate
+   cd src/catalog
+   celery -A catalog worker --loglevel=info --beat
+   ```
 
-## Order Service
+### Order Service
 
 1. Open a new terminal and run the following commands to start one order server replica at port `8002`:
    ```
@@ -74,7 +90,7 @@ USE_CACHE=<True or False> python manage.py runserver 8000
    ORDER_SERVER_ID=1 DB_NAME=db3.sqlite3 python manage.py runserver 8004
    ```
 
-## Client
+### Client
 
 Open a new terminal and run the following commands to make client query and order toys for several iterations:
 ```
