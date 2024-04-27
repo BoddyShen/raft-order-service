@@ -20,12 +20,12 @@ After pulling the entire repo, we first need to install all necessary packages. 
 
 ## Front-end Service
 
-Open a new terminal and run the following commands to start the frontend server at port `8000`:
+Open a new terminal and run the following command to start the frontend server at port `8000`. Use `USE_CACHE=True` to enable caching and `USE_CACHE=False` to disable caching:
 ```
 source venv/bin/activate
 cd src/frontend
 python manage.py makemigrations && python manage.py migrate
-python manage.py runserver 8000
+USE_CACHE=<True or False> python manage.py runserver 8000
 ```
 
 ## Catalog Service

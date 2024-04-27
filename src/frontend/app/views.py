@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 import requests
@@ -12,6 +13,9 @@ import time
 import threading
 
 
+# Define whether to use cache
+USE_CACHE = True if os.environ.get("USE_CACHE") == "True" else False
+
 # Define the host and port for the catalog and order servers
 CATALOG_SERVER_HOST = "localhost"
 CATALOG_SERVER_PORT = "8001"
@@ -24,6 +28,7 @@ ORDER_SERVER_PORTS = {
 order_leader_ID=None
 order_leader_port=None
 
+# Get the logger instance for the current module
 logger = logging.getLogger(__name__)
 
 # Create a cache to store 5 query repsonses
@@ -32,6 +37,7 @@ cache = []
 # Create a read-write lock for accessing the cache
 cache_lock = ReadWriteLock()
 
+# Create a lock for leader
 leader_lock = threading.Lock()
 
 # Create a thread pool executor for concurrent task execution
@@ -79,26 +85,28 @@ def find_order_leader(max_attempts=3):
             
 
 def process_get_product_request(product_name):
-    global cache
-    # Check whether the product is in the cache
-    with cache_lock:
-        for i in range(len(cache)):
-            if cache[i]["name"] == product_name:
-                cache_response = cache[i]["response"]
-                cache.pop(i)
-                cache.append({"name": product_name, "response": cache_response})
-                return JsonResponse(status = cache_response.status_code, data = cache_response.json())
+    global USE_CACHE, cache
+    if USE_CACHE:
+        # Check whether the product is in the cache
+        with cache_lock:
+            for i in range(len(cache)):
+                if cache[i]["name"] == product_name:
+                    cache_response = cache[i]["response"]
+                    cache.pop(i)
+                    cache.append({"name": product_name, "response": cache_response})
+                    return JsonResponse(status = cache_response.status_code, data = cache_response.json())
     
     # Ask for the product detail from the catalog server
     response = requests.get(f"http://{CATALOG_SERVER_HOST}:{CATALOG_SERVER_PORT}/products/{product_name}/")
 
     # Add the successful response to the cache
     if response.status_code == 200:
-        with cache_lock:
-            # Implement the Least Recently Used (LRU) cache replacement policy
-            if len(cache) == 5:
-                cache.pop(0)
-            cache.append({"name": product_name, "response": response})
+        if USE_CACHE:
+            with cache_lock:
+                # Implement the Least Recently Used (LRU) cache replacement policy
+                if len(cache) == 5:
+                    cache.pop(0)
+                cache.append({"name": product_name, "response": response})
     return JsonResponse(status = response.status_code, data = response.json())
 
 
@@ -114,12 +122,14 @@ def process_post_order_request(order_data):
 
 
 def process_delete_cache_request(product_name):
-    # Check whether the product is in the cache
-    with cache_lock:
-        for i in range(len(cache)):
-            if cache[i]["name"] == product_name:
-                # Remove response in the cache
-                cache.pop(i)
+    global USE_CACHE
+    if USE_CACHE:
+        # Check whether the product is in the cache
+        with cache_lock:
+            for i in range(len(cache)):
+                if cache[i]["name"] == product_name:
+                    # Remove response in the cache
+                    cache.pop(i)
     
     # Return response indicating that the product cache invalidation was successful
     return JsonResponse(status=200, data={"data": {"message": f"Cache invalidated successfully"}})
