@@ -76,6 +76,6 @@ if __name__ == "__main__":
     frontend_host = sys.argv[1] if len(sys.argv) > 1 else "localhost"
     frontend_port = sys.argv[2] if len(sys.argv) > 2 else "8000"
     order_probability = float(sys.argv[3]) if len(sys.argv) > 3 else 0.5
-    iterations = sys.argv[4] if len(sys.argv) > 4 else 10
+    iterations = int(sys.argv[4]) if len(sys.argv) > 4 else 10
 
     create_session_with_urllib3(frontend_host, 8000, order_probability, iterations)

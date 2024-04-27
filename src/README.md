@@ -19,6 +19,7 @@ After pulling the entire repo, we first need to install all necessary packages. 
     ```
 
 ## Front-end Service
+
 Open a new terminal and run the following commands to start the frontend server at port `8000`:
 ```
 source venv/bin/activate
@@ -73,6 +74,16 @@ python manage.py runserver 8000
    ORDER_SERVER_ID=1 DB_NAME=db3.sqlite3 python manage.py runserver 8004
    ```
 
+## Client
+
+Open a new terminal and run the following commands to make client query and order toys for several iterations:
+```
+source venv/bin/activate
+cd src/client
+python client.py [frontend_host] [frontend_port] [order_probability] [iterations]
+```
+If `frontend_host`, `frontend_port`, `order_probability`, and `iterations` are not specified, they are set to `localhost`, `8000`, `0.5`, and `10` as default values.
+
 ## Testing
 
 1. Integration tests in frontend:
@@ -81,10 +92,3 @@ python manage.py runserver 8000
    cd src/frontend
    pytest tests -v
    ```
-
-## Client
-
-```
-cd src/client
-python client.py [frontend_host] [frontend_port] [order_probability] [iterations]
-```
