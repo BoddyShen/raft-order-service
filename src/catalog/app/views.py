@@ -131,10 +131,11 @@ def process_post_order_request(order_data):
     except Exception as e:
         return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
 
-def process_post_cache_restock_request(product_data):
-    if "product_name" in product_data and "quantity" in product_data:
-        product_name = product_data["product_name"]
-        quantity = product_data["quantity"]
+
+def process_post_cache_restock_request(restock_data):
+    if "product_name" in restock_data and "quantity" in restock_data:
+        product_name = restock_data["product_name"]
+        quantity = restock_data["quantity"]
         if product_name in catalogs_in_memory:
             with catalogs_lock:
                 catalogs_in_memory[product_name]["quantity"] = quantity
@@ -172,7 +173,7 @@ def post_order(request):
 @require_POST
 def post_cache_restock(request):
     try:
-        # TODO: figure out why requests in restock here can't be a json data
+        # Extract data from the request
         restock_data = json.loads(request.body)
         # Submit a task to the thread pool executor
         future = executor.submit(process_post_cache_restock_request, restock_data)
