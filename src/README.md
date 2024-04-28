@@ -36,7 +36,7 @@ After pulling the entire repo, we first need to install all necessary packages. 
 
 ### Front-end Service
 
-Open a new terminal and run the following command to start the frontend server at port `8000`. Use `USE_CACHE=True` to enable caching and `USE_CACHE=False` to disable caching:
+Open a new terminal and run the followings command to start the frontend server at port `8000`. Use `USE_CACHE=True` to enable caching and `USE_CACHE=False` to disable caching:
 ```
 source venv/bin/activate
 cd src/frontend

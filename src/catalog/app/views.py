@@ -38,7 +38,7 @@ def restock_product():
                 product_in_db = Product.objects.get(name=product["name"])
             with catalogs_lock:
                 product_in_memory = catalogs_in_memory.get(product["name"], None)
-            print(product_in_db)
+
             if not product_in_memory:
                 with catalogs_lock:
                     catalogs_in_memory[product["name"]] = {
@@ -47,7 +47,6 @@ def restock_product():
                         "quantity": product_in_db.quantity
                     }
             product_in_db = Product.objects.get(name=product["name"])
-            print("product_in_db", product_in_db)
             
             # Check whether each product is out of stock
             if product_in_db.quantity <= 0:
@@ -56,9 +55,7 @@ def restock_product():
                     product_in_db.quantity = product["quantity"]
                     product_in_db.save()
                 with catalogs_lock:
-                    print(catalogs_in_memory[product["name"]])
                     catalogs_in_memory[product["name"]]["quantity"] = product["quantity"]
-                    print(catalogs_in_memory[product["name"]])
                 
                 # Send request to the frontend server to invalidate the restocked product in the cache
                 product_in_db.quantity = product["quantity"]
@@ -66,13 +63,11 @@ def restock_product():
 
                 # Send request to the frontend and catalog server to invalidate the restocked product in the cache
                 requests.delete(f"http://{FRONTEND_SERVER_HOST}:{FRONTEND_SERVER_PORT}/cache/{product['name']}/")
+
                 # Send request to restock the product in the cache
-                url = f"http://{CATALOG_SERVER_HOST}:{CATALOG_SERVER_PORT}/cache/restock/"
-                headers = {'Content-Type': 'application/json'}
-                payload = {"product_name": "Tux", "quantity": 100}
-                 
-                requests.post(url, headers=headers, json=payload)
-                # requests.post(url, json={'product_name': 'Tux', 'quantity': 100})
+                payload = {"product_name": product["name"], "quantity": product["quantity"]}
+                requests.post(f"http://{CATALOG_SERVER_HOST}:{CATALOG_SERVER_PORT}/cache/restock/", json=payload)
+
                 print(f"Restocked { product['name']}")
         except Product.DoesNotExist:
             # Create the product in the stock database if it does not exist
