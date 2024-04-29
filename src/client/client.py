@@ -90,17 +90,19 @@ def create_session_with_urllib3(frontend_host, frontend_port, order_probability=
             print(f"An error occurred while verifying order {order_number}: {str(e)}")
 
     # Print out the latencies and order check results
-    print("=================\n"
-          "| Query Request |\n"
-          "=================\n"
-          "Total number of query requests: {}\n"
-          "Average Latency: {:.7f} seconds\n".format(len(query_latencies), sum(query_latencies) / len(query_latencies)))
-    print("=================\n"
-          "| Order Request |\n"
-          "=================\n"
-          "Total number of order requests: {}\n"
-          "Average Latency: {:.7f} seconds\n"
-          "Total number of unmatched order: {}\n".format(len(order_latencies), sum(order_latencies) / len(order_latencies), difference))
+    if query_latencies:
+        print("=================\n"
+            "| Query Request |\n"
+            "=================\n"
+            "Total number of query requests: {}\n"
+            "Average Latency: {:.7f} seconds\n".format(len(query_latencies), sum(query_latencies) / len(query_latencies)))
+    if order_latencies:
+        print("=================\n"
+            "| Order Request |\n"
+            "=================\n"
+            "Total number of order requests: {}\n"
+            "Average Latency: {:.7f} seconds\n"
+            "Total number of unmatched order: {}\n".format(len(order_latencies), sum(order_latencies) / len(order_latencies), difference))
 
 
 
