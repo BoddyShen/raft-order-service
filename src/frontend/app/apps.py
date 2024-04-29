@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+from django.conf import settings
 from . import views
 
 class AppConfig(AppConfig):
@@ -6,5 +7,6 @@ class AppConfig(AppConfig):
     name = 'app'
 
     def ready(self):
-        views.find_order_leader()
+        if not getattr(settings, 'TESTING', False):
+            views.find_order_leader()
     

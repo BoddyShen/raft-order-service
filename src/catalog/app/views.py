@@ -4,11 +4,9 @@ from celery import shared_task
 from concurrent.futures import ThreadPoolExecutor
 from django.db import transaction
 from django.http import JsonResponse
-from django.forms.models import model_to_dict
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from .models import Product
 from .utils import catalogs, ReadWriteLock
-from urllib.parse import parse_qs, parse_qsl
 
 
 # Define the host and port for the frontend server
@@ -140,8 +138,8 @@ def process_post_cache_restock_request(restock_data):
             with catalogs_lock:
                 catalogs_in_memory[product_name]["quantity"] = quantity
 
-    # Return response indicating that the product cache invalidation was successful
-    return JsonResponse(status=200, data={"data": {"message": f"Cache invalidated successfully"}})
+    # Return response indicating that the product cache restock was successful
+    return JsonResponse(status=200, data={"data": {"message": f"Cache restock successfully"}})
 
 
 @require_GET
