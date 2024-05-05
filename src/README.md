@@ -37,11 +37,20 @@ After pulling the entire repo, we first need to install all necessary packages. 
 ### Front-end Service
 
 Open a new terminal and run the followings command to start the frontend server at port `8000`. Use `USE_CACHE=True` to enable caching and `USE_CACHE=False` to disable caching:
+
 ```
 source venv/bin/activate
 cd src/frontend
 python manage.py makemigrations && python manage.py migrate
 USE_CACHE=<True or False> python manage.py runserver 8000
+```
+
+#### For Raft
+
+```
+USE_RAFT=True python manage.py makemigrations && USE_RAFT=True python manage.py migrate
+USE_RAFT=True USE_CACHE=True python manage.py runserver 8000
+
 ```
 
 ### Catalog Service
@@ -75,12 +84,22 @@ USE_CACHE=<True or False> python manage.py runserver 8000
    python manage.py makemigrations && DB_NAME=db1.sqlite3 python manage.py migrate
    ORDER_SERVER_ID=3 DB_NAME=db1.sqlite3 python manage.py runserver 8002
    ```
+   ##### For Raft
+   ```
+   USE_RAFT=True python manage.py makemigrations && USE_RAFT=True DB_NAME=db1.sqlite3 python manage.py migrate
+   USE_RAFT=True ORDER_SERVER_ID=3 DB_NAME=db1.sqlite3 python manage.py runserver 8002
+   ```
 2. Open another terminal and run the following commands to start another order server replica at port `8003`:
    ```
    source venv/bin/activate
    cd src/order
    python manage.py makemigrations && DB_NAME=db2.sqlite3 python manage.py migrate
    ORDER_SERVER_ID=2 DB_NAME=db2.sqlite3 python manage.py runserver 8003
+   ```
+   ##### For Raft
+   ```
+   USE_RAFT=True python manage.py makemigrations && USE_RAFT=True DB_NAME=db2.sqlite3 python manage.py migrate
+   USE_RAFT=True ORDER_SERVER_ID=2 DB_NAME=db2.sqlite3 python manage.py runserver 8003
    ```
 3. Open another terminal and run the following commands to start the last order server replica at port `8004`:
    ```
@@ -89,10 +108,18 @@ USE_CACHE=<True or False> python manage.py runserver 8000
    python manage.py makemigrations && DB_NAME=db3.sqlite3 python manage.py migrate
    ORDER_SERVER_ID=1 DB_NAME=db3.sqlite3 python manage.py runserver 8004
    ```
+   ##### For Raft
+   ```
+   USE_RAFT=True python manage.py makemigrations && USE_RAFT=True DB_NAME=db3.sqlite3 python manage.py migrate
+   USE_RAFT=True ORDER_SERVER_ID=1 DB_NAME=db3.sqlite3 python manage.py runserver 8004
+   ```
+4. For test the delay network, "USE_DELAY=True" in the raft mode, which will sleep 5 seconds after a leader store the log in its local before sending
+   append_entry to peers.
 
 ### Client
 
 Open a new terminal and run the following commands to make client query and order toys for several iterations:
+
 ```
 source venv/bin/activate
 cd src/client

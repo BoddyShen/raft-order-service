@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import requests
+import random
 from concurrent.futures import ThreadPoolExecutor
 from django.views import View
 from django.utils.decorators import method_decorator
@@ -12,7 +13,9 @@ from .utils import ReadWriteLock
 import time
 import threading
 
-
+# Define whether to use Raft, if yes, then the order_leader_ID will be random,
+# frontend or client won't know the real leader in Raft servers
+USE_RAFT = True if os.environ.get("USE_RAFT") == "True" else False
 # Define whether to use cache
 USE_CACHE = True if os.environ.get("USE_CACHE") == "True" else False
 
@@ -25,13 +28,17 @@ ORDER_SERVER_PORTS = {
     "2": "8003",
     "1": "8004",
 }
-order_leader_ID=None
-order_leader_port=None
+
+def random_choice_raft_server():
+    return random.choice(list(ORDER_SERVER_PORTS.keys())) 
+
+order_leader_ID=random_choice_raft_server() if USE_RAFT else None
+order_leader_port=ORDER_SERVER_PORTS[order_leader_ID] if order_leader_ID else None
 
 # Get the logger instance for the current module
 logger = logging.getLogger(__name__)
 
-# Create a cache to store 5 query repsonses
+# Create a cache to store 5 query responses
 cache = []
 
 # Create a read-write lock for accessing the cache
@@ -81,8 +88,7 @@ def find_order_leader(max_attempts=3):
                 i = 3
             else: i -= 1
     
-    return 
-            
+    return
 
 def process_get_product_request(product_name):
     global USE_CACHE, cache
@@ -117,6 +123,7 @@ def process_get_order_request(order_number):
 
 def process_post_order_request(order_data):
     # Send the buy request to the order server
+    print(f"http://{ORDER_SERVER_HOST}:{order_leader_port}/orders/")
     response = requests.post(f"http://{ORDER_SERVER_HOST}:{order_leader_port}/orders/", json=order_data)
     return JsonResponse(status = response.status_code, data = response.json())
 
@@ -166,7 +173,13 @@ def get_order(request, order_number):
     except Exception as e:
         logger.info("Error connecting to leader. Re-electing...")
 
-        leader = find_order_leader()
+        if not os.environ.get("USE_RAFT") == "True": 
+            leader = find_order_leader()
+        else:
+            with leader_lock:
+                leader = random_choice_raft_server()
+                order_leader_port=ORDER_SERVER_PORTS[leader]
+
         if leader:
             logger.info(f'''Current leader switched to ID: {leader}''')
             try:
@@ -179,6 +192,7 @@ def get_order(request, order_number):
     
 @require_POST
 def post_order(request):
+    global order_leader_port
     try:
         # Extract data from the request
         order_data = json.loads(request.body)
@@ -189,18 +203,31 @@ def post_order(request):
         return response
     except Exception as e:
         logger.info("Error connecting to leader. Re-electing...")
-        # print("Error connecting to leader. Re-electing...")
 
-        leader = find_order_leader()
+    max_attempts = 3
+    attempt_count = 0
+    while attempt_count < max_attempts:
+        attempt_count += 1
+        if not os.environ.get("USE_RAFT") == "True": 
+            print("Not using Raft")
+            leader = find_order_leader()
+        else:
+            with leader_lock:
+                leader = random_choice_raft_server()
+                order_leader_port=ORDER_SERVER_PORTS[leader]
+
         if leader:
             logger.info(f'''Current leader switched to ID: {leader}''')
             try:
                 future = executor.submit(process_post_order_request, order_data)
                 response = future.result()
                 return response
-            except:
-                pass  
-        return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
+            except Exception as e:
+                logger.info(f"Attempt {attempt_count} failed: {str(e)}")
+                if attempt_count == max_attempts:
+                    break   
+  
+    return JsonResponse(status=500, data={"error": {"code": 500, "message": "Internal server error"}})
 
 
 @require_http_methods(["DELETE"])
