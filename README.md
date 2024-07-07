@@ -1,7 +1,14 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-24ddc0f5d75046c5622901739e7c5dd533143b0c8e959d652212380cedb1ea36.svg)](https://classroom.github.com/a/4-cdj-MR)
-Compsci 677: Distributed and Operating Systems
 
-Spring 2024
+# Raft Order Service
+This Lab is based on UMass Amherst CS 677.
+
+Raft is a consensus algorithm used for managing a replicated log. A primary challenge in the previous design structure is the lack of visibility into the actual state of the order server, such as database stocks and client responses. If the leader Order Server or the Frontend Server crashes and is restored, selecting a server with a higher ID for leadership could lead to issues.
+
+To know more about the design of Raft in this project, please refer to Raft_Design.pdf.
+To see the Raft class, which each server instantiates upon startup, please refer to https://github.com/BoddyShen/raft-order-service/blob/main/src/order/app/utils/raft.py
+
+
+
 
 # Lab 3: Asterix and Double Trouble - Caching, Replication and Fault Tolerance
 
